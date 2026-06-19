@@ -36,11 +36,19 @@ if (process.env.NODE_ENV === "production") {
     res.sendFile(path.resolve(__dirname, "../frontend/dist/index.html"));
   });
 }
+const startServer = async () => {
+  try {
+    await connectDB();
 
-server.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
-  connectDB();
-});
+    server.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+    });
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+startServer();
 // app.listen(port, () => {
 //   console.log(`Server is running on http://localhost:${port}`);
 //   connectDB();
