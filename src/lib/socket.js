@@ -2,6 +2,7 @@ import { Server } from "socket.io";
 import http from "http";
 import express from "express";
 import { socketAuthMiddleware } from "../middleware/socket.auth.middleware.js";
+import MessageModel from "../models/message.model.js";
 
 const app = express();
 const server = http.createServer(app);
@@ -29,13 +30,46 @@ io.on("connection", (socket) => {
   // used to send events to all connected clients
   io.emit("getOnlineUsers", Object.keys(userSocketMap));
 
+  // Handle real-time message sending via socket.io
+  socket.on("sendMessage", async (messageData) => {
+    try {
+      const { text, image, receiverID } = messageData;
+      const senderID = socket.userId;
+
+      if (!text && !image) {
+        socket.emit("messageError", { message: "Message content is empty" });
+        return;
+      }
+
+      // Save message to database
+      const newMessage = new MessageModel({
+        senderID,
+        receiverID,
+        text,
+        image,
+      });
+      await newMessage.save();
+
+      // Emit to receiver in real-time
+      const receiverSocketId = userSocketMap[receiverID];
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit("newMessage", newMessage);
+      }
+
+      // Confirm to sender
+      socket.emit("messageSent", newMessage);
+    } catch (error) {
+      console.error("Error in sendMessage:", error);
+      socket.emit("messageError", { message: "Failed to send message" });
+    }
+  });
+
   // with socket.on we listen events from clients
   socket.on("disconnect", () => {
     console.log("A user disconnected", socket.user.fullname);
     delete userSocketMap[userId];
+    io.emit("getOnlineUsers", Object.keys(userSocketMap));
   });
-  io.emit("", Object.keys(userSocketMap));
 });
-;
 
 export { io, app, server };
